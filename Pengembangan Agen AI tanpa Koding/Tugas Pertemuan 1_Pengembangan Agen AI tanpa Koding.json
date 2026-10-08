@@ -1,0 +1,114 @@
+{
+  "name": "Tugas Pertemuan 1_Pengembangan Agen AI tanpa Koding",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        0
+      ],
+      "id": "04623d8e-a0ce-4607-a904-43f52cea0cca",
+      "name": "When chat message received",
+      "webhookId": "f28399d8-5b25-4c46-bd99-f4034d71d184"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Kamu adalah Asisten AI untuk Layanan Pelanggan Toko Online. Tugasmu adalah menjawab pertanyaan pelanggan seputar produk, harga, dan status pengiriman secara ramah dan profesional.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "42ebf237-ba0b-45b7-8363-4ca78bf1b8bc",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        320,
+        176
+      ],
+      "id": "a753855c-c18b-45ce-8271-f49eca34af42",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        96,
+        208
+      ],
+      "id": "ee413bad-358f-493d-8619-38753b7c5419",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "7zzT8DCRzLWGMTdT",
+          "name": "Groq account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "1efc6a64-1b61-466d-af83-31097e72c30e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "dc96f10ae7dc95d3c138575ba243a0a167923dbcb524841d451aadf9135d5fb3"
+  },
+  "nodeGroups": [],
+  "id": "r4qFykFgAVdeuGXy",
+  "tags": []
+}
