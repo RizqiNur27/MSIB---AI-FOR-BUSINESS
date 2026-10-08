@@ -1,0 +1,160 @@
+{
+  "name": "Tugas Pertemuan 2_Pengembangan Agen AI tanpa Koding",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "initialMessages": "Hi there! 👋\nMy name is Kiki. How can I assist you today?",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        0
+      ],
+      "id": "fe9f2855-8210-4d56-b1af-db1d47526b3c",
+      "name": "When chat message received",
+      "webhookId": "59e57f30-cd8d-4d33-9be9-3bcccdb8e927"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "Kamu adalah Customer Service AI Customer Assistant untuk penyedia program pelatihan teknologi dan bisnis.\n\nTugas utama kamu adalah:\n1. Menjawab pertanyaan pengguna mengenai program/kursus pelatihan, deskripsi topik materi, dan biaya/harga pelatihan.\n2. Setiap kali pengguna bertanya mengenai program pelatihan, topik, atau harganya, kamu HARUS selalu menggunakan Tool \"Get row(s) in sheet in Google Sheets\" untuk mengecek data terbaru di Google Sheets.\n3. Berikan jawaban secara sopan, ramah, ringkas, dan jelas dalam bahasa Indonesia.\n4. Jika pelatihan yang dicari tidak ditemukan di data Google Sheets, sampaikan dengan santun bahwa program tersebut saat ini belum tersedia."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "09db29db-4118-4d4c-9de1-377c16cc978d",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        224,
+        192
+      ],
+      "id": "4d96bb97-77af-4f15-9569-89223d708f26",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "7zzT8DCRzLWGMTdT",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        320,
+        192
+      ],
+      "id": "1416d859-bcac-4b67-bd4d-371ff93c1009",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1xX3ty-CS6U4nMjhfkvhtC2YfYu36MCRyXhDwnBJIrOY",
+          "mode": "list",
+          "cachedResultName": "Copy of n8n 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xX3ty-CS6U4nMjhfkvhtC2YfYu36MCRyXhDwnBJIrOY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xX3ty-CS6U4nMjhfkvhtC2YfYu36MCRyXhDwnBJIrOY/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        432,
+        192
+      ],
+      "id": "b7eb27a2-c78c-41f8-8213-c9b54383836d",
+      "name": "Get row(s) in sheet in Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "x7n1EiIowi8BG9uO",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet in Google Sheets": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "842d23ad-2098-46d6-b719-ec3368cc45cd",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "dc96f10ae7dc95d3c138575ba243a0a167923dbcb524841d451aadf9135d5fb3"
+  },
+  "nodeGroups": [],
+  "id": "3acfwNeTOEaoSHhg",
+  "tags": []
+}
