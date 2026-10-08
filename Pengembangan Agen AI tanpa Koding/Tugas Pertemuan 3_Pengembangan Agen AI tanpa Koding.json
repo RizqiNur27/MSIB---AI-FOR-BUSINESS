@@ -1,0 +1,160 @@
+{
+  "name": "Tugas Pertemuan 3_Pengembangan Agen AI tanpa Koding",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "initialMessages": "Halo! Nama saya Rizqi. Ada yang bisa saya bantu hari ini?   ",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        0
+      ],
+      "id": "f87bf15a-6623-4b0d-96c0-e25292ec724e",
+      "name": "When chat message received",
+      "webhookId": "ff721f86-75a2-40bd-8525-2bb35f7f3ebb"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "Anda adalah Customer Service Virtual / Assistant AI resmi dari NF ACADEMY.\nTugas utama Anda adalah menjawab pertanyaan pengguna seputar daftar program pelatihan/kursus, deskripsi topik, dan biaya/harga.\n\nAturan Kerja:\n1. Gunakan Tool \"Google Sheets\" untuk mengambil/membaca data program pelatihan secara real-time.\n2. Selalu bersikap ramah, profesional, dan informatif.\n3. Jika pengguna menanyakan tentang pelatihan tertentu, cari informasinya di Google Sheets dan berikan detail topik serta biayanya secara jelas.\n4. Jika informasi yang dicari tidak ditemukan di sheet, sampaikan dengan sopan bahwa program tersebut belum tersedia di NF Academy."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "61826ce8-d46e-41af-8e29-ec9bbb02bd85",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        176,
+        160
+      ],
+      "id": "b37cedad-f424-45ec-a08f-0ee578072fa4",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "7zzT8DCRzLWGMTdT",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        320,
+        160
+      ],
+      "id": "90fdf740-b6d9-4499-bcaf-8432fb5bc3ae",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1NFi9YJJsjRTzSJr7YFpu8L7OaKql9pxUwTBkpQRoM9Y",
+          "mode": "list",
+          "cachedResultName": "Data Pelatihan NF Academy",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1NFi9YJJsjRTzSJr7YFpu8L7OaKql9pxUwTBkpQRoM9Y/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1NFi9YJJsjRTzSJr7YFpu8L7OaKql9pxUwTBkpQRoM9Y/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        464,
+        160
+      ],
+      "id": "1f3c2aff-34f7-47e3-9d4c-5117c4068d5f",
+      "name": "Data NF Academy",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "x7n1EiIowi8BG9uO",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data NF Academy": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "624314cb-230d-49a9-8698-67ff4011f706",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "dc96f10ae7dc95d3c138575ba243a0a167923dbcb524841d451aadf9135d5fb3"
+  },
+  "nodeGroups": [],
+  "id": "TYMyhIL4CMUfW7JG",
+  "tags": []
+}
