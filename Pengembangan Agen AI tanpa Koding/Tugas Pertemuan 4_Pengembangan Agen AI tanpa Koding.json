@@ -1,0 +1,300 @@
+{
+  "name": "Tugas Pertemuan 4_Pengembangan Agen AI tanpa Koding",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "597a3487-3ad8-45dd-9eeb-86185e6fd9a8",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "1TGf-4KbxVZ_f1O8qwXTZjqh8FdyUKdqN",
+          "mode": "list",
+          "cachedResultName": "Panduan Penulisan Ilmiah Tugas Akhir Skripsi.pdf",
+          "cachedResultUrl": "https://drive.google.com/file/d/1TGf-4KbxVZ_f1O8qwXTZjqh8FdyUKdqN/view?usp=drivesdk"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        224,
+        0
+      ],
+      "id": "6b7d4fef-aba0-4bf8-bd4e-ae35a1de786a",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "ZviVuqH9gQNOwZbb",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        0
+      ],
+      "id": "a4ad2fca-c4f0-44db-b62c-d7b20da662bd",
+      "name": "Supabase Vector Store",
+      "credentials": {
+        "supabaseApi": {
+          "id": "EgI0u7HAvCtkwOF4",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        592,
+        208
+      ],
+      "id": "e50cc9f9-6ea3-4080-a7e1-2e388d08aeb9",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "public": true,
+        "options": {
+          "title": "Tanyakan aturan penulisan tugas akhirmu!"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -64,
+        384
+      ],
+      "id": "64c9ce33-ac85-486a-8e14-0194d45e9824",
+      "name": "When chat message received",
+      "webhookId": "5cdf64bf-295c-4223-bb93-cb384da4462f"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Kamu adalah Asisten Akademik AI yang ramah, profesional, dan membantu. Tugas utama kamu adalah menjawab pertanyaan pengguna mengenai aturan, format, dan tata cara Penulisan Ilmiah Tugas Akhir Skripsi.\n\nAturan Penting:\n1. Kamu WAJIB menggunakan Tool 'Supabase Vector Store' untuk mencari informasi sebelum memberikan jawaban.\n2. Jawablah berdasarkan informasi dari dokumen pedoman yang ditemukan di Supabase Vector Store.\n3. Susun jawaban secara terstruktur (gunakan bullet points jika menjelaskan poin-poin).\n4. Jika informasi tidak ditemukan dalam dokumen, katakan secara jujur bahwa informasi tersebut tidak tercantum dalam pedoman skripsi.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        160,
+        384
+      ],
+      "id": "d0e9a518-147b-4c8d-899d-dec93d945b09",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        112,
+        560
+      ],
+      "id": "aeca5e64-6943-497c-8cea-81e8e5dd2572",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "7zzT8DCRzLWGMTdT",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        224,
+        560
+      ],
+      "id": "0affe8dc-3bc2-4c8b-9324-36fc55268c45",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Gunakan tool ini untuk mencari informasi seputar aturan, format, dan tata cara penulisan ilmiah tugas akhir skripsi.",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        352,
+        560
+      ],
+      "id": "3d4ddbca-9d6a-4bc4-9739-4ec07c18b921",
+      "name": "Supabase Vector Store1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "EgI0u7HAvCtkwOF4",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsHuggingFaceInference",
+      "typeVersion": 1,
+      "position": [
+        496,
+        208
+      ],
+      "id": "0d1df04c-77e4-4cd1-b932-e54be036f7cc",
+      "name": "Embeddings HuggingFace Inference",
+      "credentials": {
+        "huggingFaceApi": {
+          "id": "oA1fNfrcOoJ7EnA5",
+          "name": "Hugging Face account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Vector Store1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings HuggingFace Inference": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          },
+          {
+            "node": "Supabase Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "1387ff1a-7ee9-4f58-89cf-b6761df2fcd9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "dc96f10ae7dc95d3c138575ba243a0a167923dbcb524841d451aadf9135d5fb3"
+  },
+  "nodeGroups": [],
+  "id": "I7rNZQi8XTJdrou3",
+  "tags": []
+}
