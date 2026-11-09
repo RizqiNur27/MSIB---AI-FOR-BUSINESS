@@ -1,0 +1,236 @@
+{
+  "name": "Tugas Pertemuan 7 Implementasi AI untuk Manajemen SDM_9 November 2026",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Form Rekrutmen Posisi Manajemen Marketing",
+        "formDescription": "Harap isi form dibawah ini sesuai dengan ketentuan yang berlaku.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Nama Lengkap",
+              "placeholder": "Muhammad Rizqi Nurrohmat",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Pengalaman",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "< 1 tahun"
+                  },
+                  {
+                    "option": "1 - 3 tahun"
+                  },
+                  {
+                    "option": "> 3 tahun"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Upload CV (PDF)",
+              "fieldType": "file",
+              "acceptFileTypes": "pdf",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4c55e8f6-4eee-49d2-b803-7d545e99069e",
+      "name": "On form submission",
+      "webhookId": "f6f5e9d0-81f4-4181-9f17-a7ec560dacc7"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "Upload_CV__PDF_",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.2,
+      "position": [
+        432,
+        0
+      ],
+      "id": "04a68acb-3e2b-49de-a53f-ef45165535b5",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Peran: Anda adalah Senior Recruiter yang sangat teliti dan objektif. Tugas Anda adalah mengevaluasi teks CV kandidat di bawah ini untuk posisi Manajemen Marketing.\n\nKonteks CV Kandidat:\n\"\"\"\n{{ $json.text }}\n\"\"\"\n\nInstruksi Penilaian:\n1. Analisis pengalaman kerja, keahlian teknis (Hard Skills), dan latar belakang pendidikan.\n2. Berikan skor profesional dari 0-100.\n   - Skor < 50: Tidak relevan/Pemula.\n   - Skor 50-75: Menengah/Potensial.\n   - Skor > 75: Sangat Cocok/Senior.\n\nFormat Output (WAJIB JSON TUNGGAL - DILANGAR JIKA MEMBUNGKUS DALAM ARRAY/CANDIDATES):\nJangan berikan basa-basi atau teks pembuka. HANYA berikan output JSON tunggal dengan struktur berikut:\n{\n  \"candidate_name\": \"Nama lengkap kandidat\",\n  \"years_of_experience\": \"Estimasi total tahun pengalaman\",\n  \"top_skills\": [\"Skill 1\", \"Skill 2\", \"Skill 3\"],\n  \"summary\": \"Ringkasan profil kandidat dalam 1 paragraf pendek dalam Bahasa Indonesia.\",\n  \"strengths\": \"Poin kuat kandidat\",\n  \"weaknesses\": \"Kekurangan/hal yang perlu diklarifikasi\",\n  \"score\": 80,\n  \"hiring_recommendation\": \"YES / NO / MAYBE\"\n}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        640,
+        0
+      ],
+      "id": "2862cf72-6883-4d06-8b6c-c971a76a1c41",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nfor (let item of items) {\n  const aiResponseText = item.json.text; // Output teks dari LLM\n  \n  try {\n    // 1. Bersihkan formatting jika AI memberikan markdown ```json ... ```\n    const cleanJson = aiResponseText.replace(/```json|```/g, '').trim();\n    \n    // 2. Parse string menjadi Objek\n    let parsedData = JSON.parse(cleanJson);\n    \n    // FISIKAN HANDLING: Jika AI membungkus objek dalam array `candidates`\n    if (parsedData.candidates && Array.isArray(parsedData.candidates) && parsedData.candidates.length > 0) {\n      parsedData = parsedData.candidates[0];\n    } else if (Array.isArray(parsedData) && parsedData.length > 0) {\n      parsedData = parsedData[0];\n    }\n    \n    // 3. Masukkan ke item.json agar bisa dipanggil node selanjutnya\n    item.json.ai_name = parsedData.candidate_name || \"Tidak Terdeteksi\";\n    item.json.ai_exp = parsedData.years_of_experience || 0;\n    \n    // Handling array skills\n    if (Array.isArray(parsedData.top_skills)) {\n      item.json.ai_skills = parsedData.top_skills.join(\", \");\n    } else {\n      item.json.ai_skills = parsedData.top_skills || \"-\";\n    }\n    \n    item.json.ai_summary = parsedData.summary || \"-\";\n    item.json.ai_score = parsedData.score || 0;\n    item.json.ai_rec = parsedData.hiring_recommendation || \"-\";\n    \n  } catch (error) {\n    // Fallback jika AI gagal generate JSON valid\n    item.json.error = \"Gagal parsing JSON dari AI: \" + error.message;\n    item.json.raw_output = aiResponseText;\n  }\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        0
+      ],
+      "id": "d5040166-808d-4b9c-a0e3-cae3b3e53b19",
+      "name": "Mengubah JSON ke Object"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all(); // Ambil data input \n\nfor (let item of items) {\n  const binaryData = item.binary?.Upload_CV__PDF_;\n\n  if (binaryData) {\n    item.json.cv_base64 = binaryData.data; // Data base64 internal \n    item.json.fileName = binaryData.fileName;\n  }\n\n  // Tambahkan tanggal format Indonesia menggunakan Luxon \n  item.json.tanggal_input = DateTime.now().toFormat('dd-MM-yyyy HH:mm');\n}\n\nreturn items;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "84cf4e12-e5a3-46a8-8c9f-dca449b4df80",
+      "name": "Mengkonversi ke Base64"
+    },
+    {
+      "parameters": {
+        "chatId": "7091419525",
+        "text": "=Nama: {{ $json.ai_name }}\nSkills: {{ $json.ai_skills }}\nScore: {{ $json.ai_score }}\nSummary: {{ $json.ai_summary }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1168,
+        0
+      ],
+      "id": "367747bb-9661-4b8a-98f5-c93618c4ca5a",
+      "name": "Send a text message",
+      "webhookId": "93b48ff3-899d-4749-a5c7-8d940a7d208f",
+      "credentials": {
+        "telegramApi": {
+          "id": "6tnhdQnkF4kby0oc",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        640,
+        192
+      ],
+      "id": "c5b3bee5-649e-47e6-9b22-18d7f5757476",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "7zzT8DCRzLWGMTdT",
+          "name": "Groq account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Mengkonversi ke Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Mengubah JSON ke Object",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mengkonversi ke Base64": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mengubah JSON ke Object": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8d22cde6-ff69-488b-b2b3-64215d348eb5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "dc96f10ae7dc95d3c138575ba243a0a167923dbcb524841d451aadf9135d5fb3"
+  },
+  "nodeGroups": [],
+  "id": "djM9N4DZCoLK1AS6",
+  "tags": []
+}
