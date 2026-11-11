@@ -1,0 +1,373 @@
+{
+  "name": "Tugas Pertemuan 8 Implementasi AI untuk Manajemen SDM_10 November 2026",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "f42a86d6-eb92-43dd-982f-2285c011a0e8",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        624,
+        0
+      ],
+      "id": "35f0b715-6862-4a4c-a68a-1c2820be44a6",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analisis feedback karyawan berikut dalam bahasa Indonesia:\n\"{{ $json.feedback }}\"\n\nTentukan sentiment, category, dan action_plan (maksimal 5 kata) sesuai instruksi skema JSON.",
+        "hasOutputParser": true,
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        992,
+        16
+      ],
+      "id": "9e53b0ae-87ba-4509-aa5d-d7d9a08f72c5",
+      "name": "Basic LLM Chain",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1lN2OPS8dK5hWDox8CpP73-CLc96PqNTh-9US3PY4eRk",
+          "mode": "list",
+          "cachedResultName": "Data Dummy Survey Kepuasan Karyawan (1)",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lN2OPS8dK5hWDox8CpP73-CLc96PqNTh-9US3PY4eRk/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 307686697,
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lN2OPS8dK5hWDox8CpP73-CLc96PqNTh-9US3PY4eRk/edit#gid=307686697"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "e03b08c9-8f35-4c76-9997-c03282cee4fb",
+      "name": "Mengambil Hasil Survey",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "x7n1EiIowi8BG9uO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop semua baris data dari Google Sheet\nfor (const item of items) {\n  // Ambil data feedback dari kolom B\n  const feedbackText = item.json.feedback;\n\n  // Lewati baris jika feedback kosong\n  if (!feedbackText) continue;\n\n  // Buat Prompt Khusus.\n  // Kita minta output JSON agar mudah diolah mesin.\n  const prompt = `\n  Analyze this employee feedback in Indonesian: \"${feedbackText}\"\n\n  Tasks:\n  1. Determine sentiment (POSITIVE, NEUTRAL, NEGATIVE).\n  2. Categorize the issue (e.g., Facility, Management, Salary, Workload, Training).\n  3. Suggest a quick action (max 5 words).\n\n  You must output ONLY valid JSON in this format:\n  {\n    \"sentiment\": \"...\",\n    \"category\": \"...\",\n    \"action_plan\": \"...\"\n  }\n  `;\n\n  // Simpan prompt ke property baru 'ai_prompt' untuk dikirim ke node HTTP Request\n  item.json.ai_prompt = prompt;\n}\n\nreturn items;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        0
+      ],
+      "id": "c8082612-933d-458a-9572-51c6e2ec4620",
+      "name": "Menyiapkan Prompt"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1lN2OPS8dK5hWDox8CpP73-CLc96PqNTh-9US3PY4eRk",
+          "mode": "list",
+          "cachedResultName": "Data Dummy Survey Kepuasan Karyawan (1)",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lN2OPS8dK5hWDox8CpP73-CLc96PqNTh-9US3PY4eRk/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 307686697,
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lN2OPS8dK5hWDox8CpP73-CLc96PqNTh-9US3PY4eRk/edit#gid=307686697"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "employee_id": "=={{ $json.employee_id || $('Loop Over Items').item.json.employee_id }}",
+            "feedback": "={{ $('Mengambil Hasil Survey').item.json.feedback }}",
+            "sentiment": "=={{ $json.output?.sentiment || $json.sentiment }}",
+            "category": "=={{ $json.output?.category || $json.category }}",
+            "action_plan": "=={{ $json.output?.action_plan || $json.action_plan }}",
+            "timestamp": "={{ $('Mengambil Hasil Survey').item.json.timestamp }}"
+          },
+          "matchingColumns": [
+            "employee_id"
+          ],
+          "schema": [
+            {
+              "id": "employee_id",
+              "displayName": "employee_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "feedback",
+              "displayName": "feedback",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sentiment",
+              "displayName": "sentiment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "action_plan",
+              "displayName": "action_plan",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1360,
+        16
+      ],
+      "id": "204b8a13-54e5-486a-9d18-e5c2279b0f7d",
+      "name": "Update Survey",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "x7n1EiIowi8BG9uO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        832,
+        16
+      ],
+      "id": "7a6f73c6-fc22-4a93-8fbf-c27ad5ac3fdb",
+      "name": "Wait",
+      "webhookId": "82fc80bb-82d2-4435-91cf-12b748e42104"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-4.1-nano",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        944,
+        272
+      ],
+      "id": "9e830d46-3047-4f69-a4c5-1217aca18596",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "tj2Uro0xdnZL6UL5",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"sentiment\": {\n      \"type\": \"string\",\n      \"enum\": [\"POSITIVE\", \"NEUTRAL\", \"NEGATIVE\"],\n      \"description\": \"Sentimen dari feedback karyawan\"\n    },\n    \"category\": {\n      \"type\": \"string\",\n      \"enum\": [\"Facilities\", \"Management\", \"Salary\", \"Workload\", \"Training\", \"Other\"],\n      \"description\": \"Kategori topik utama feedback\"\n    },\n    \"action_plan\": {\n      \"type\": \"string\",\n      \"description\": \"Rekomendasi aksi singkat (maksimal 5 kata)\"\n    }\n  },\n  \"required\": [\"sentiment\", \"category\", \"action_plan\"]\n}",
+        "autoFix": true
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1104,
+        240
+      ],
+      "id": "5952599f-bba7-45c0-b23d-7b29864030c8",
+      "name": "Structured Output Parser1",
+      "onError": "continueErrorOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Mengambil Hasil Survey",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Update Survey",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mengambil Hasil Survey": {
+      "main": [
+        [
+          {
+            "node": "Menyiapkan Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Menyiapkan Prompt": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Structured Output Parser1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "df8d9598-cda8-4e53-87ac-b8e63f1066d0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "dc96f10ae7dc95d3c138575ba243a0a167923dbcb524841d451aadf9135d5fb3"
+  },
+  "nodeGroups": [],
+  "id": "pkyLBSsguO0mj1om",
+  "tags": []
+}
