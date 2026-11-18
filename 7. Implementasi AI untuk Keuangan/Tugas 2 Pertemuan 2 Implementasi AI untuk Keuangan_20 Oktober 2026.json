@@ -1,0 +1,403 @@
+{
+  "name": "Tugas 2 Pertemuan 2 Implementasi AI untuk Keuangan_20 Oktober 2026",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {
+          "customEmailConfig": "[\"UNSEEN\", [\"SINCE\", \"Nov 18, 2026\"]]"
+        }
+      },
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [
+        0,
+        208
+      ],
+      "id": "b2a42054-a50b-4f89-83fe-c26f187489d5",
+      "name": "Email Trigger (IMAP)",
+      "credentials": {
+        "imap": {
+          "id": "Gz14u5kWiMHO5udr",
+          "name": "IMAP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e52e2d02-67f5-4b4b-9e5b-9146b6240e94",
+                    "leftValue": "={{ JSON.stringify($json).toLowerCase() }}",
+                    "rightValue": "grab",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Grab"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "5e943a85-1d23-43cf-8f4c-7ff8df343d25",
+                    "leftValue": "={{ JSON.stringify($json).toLowerCase() }}",
+                    "rightValue": "tokopedia",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Tokopedia"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "63a91121-e0bb-4ac3-bdc1-d2f970b3c2df",
+                    "leftValue": "={{ JSON.stringify($json).toLowerCase() }}",
+                    "rightValue": "idcloudhost",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "IDCloudHost"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        272,
+        208
+      ],
+      "id": "969e6d90-74ea-499e-88cb-e5ee4ad5d7ad",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8aac2079-2fa9-4eab-866f-7f4b71452ea9",
+              "name": "tanggal",
+              "value": "={{ ($json.textPlain || $json.text || '').match(/(\\d{1,2}\\s+(?:Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\\s+\\d{4})/i)?.[1] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "18701216-b1c0-484d-b8e8-410eda648aca",
+              "name": "merchant",
+              "value": "Grab",
+              "type": "string"
+            },
+            {
+              "id": "056dec1f-13cb-436c-b55d-fa8026ad48a8",
+              "name": "nominal",
+              "value": "={{ Number((($json.textPlain || $json.text || '').match(/Total[^\\d]{0,30}Rp\\.?\\s*([\\d.,]+)/i)?.[1] || '0').replace(/\\./g, '').replace(',', '.')) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        576,
+        0
+      ],
+      "id": "3b74622a-2a2b-461f-87e8-a6f028b3a928",
+      "name": "Ekstrak Grab"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e644ddb5-c66c-43de-91f2-d9ad886caccd",
+              "name": "tanggal",
+              "value": "={{ ($json.textPlain || $json.text || '').match(/(\\d{1,2}\\s+(?:Jan|Feb|Mar|Apr|Mei|Jun|Jul|Agu|Sep|Okt|Nov|Des)[a-z]*\\s+\\d{4})/i)?.[1] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "dc695508-30fa-4209-ab9d-4df50b9049bb",
+              "name": "merchant",
+              "value": "Tokopedia",
+              "type": "string"
+            },
+            {
+              "id": "bbb80c40-1f22-46ea-8d13-a54832456377",
+              "name": "nominal",
+              "value": "={{ Number((($json.textPlain || $json.text || '').match(/Total[^\\d]{0,30}Rp\\.?\\s*([\\d.,]+)/i)?.[1] || '0').replace(/\\./g, '').replace(',', '.')) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        576,
+        208
+      ],
+      "id": "7d6de02b-b350-43cb-9a6d-84553385d812",
+      "name": "Ekstrak Tokopedia"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a61e9780-8a06-4110-9129-09bb57564ed6",
+              "name": "tanggal",
+              "value": "={{ ($json.textPlain || $json.text || '').match(/(\\d{4}-\\d{2}-\\d{2})/i)?.[1] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "6b316952-18c6-4c31-ae5d-03f35e96791c",
+              "name": "merchant",
+              "value": "IDCloudHost",
+              "type": "string"
+            },
+            {
+              "id": "08037fc9-4d98-4219-9389-eea97ae983fb",
+              "name": "nominal",
+              "value": "={{ Number((($json.textPlain || $json.text || '').match(/Total[^\\d]{0,30}Rp\\.?\\s*([\\d.,]+)/i)?.[1] || '0').replace(/\\./g, '').replace(',', '.')) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        576,
+        400
+      ],
+      "id": "74689677-e724-43cb-8637-58354802b4bc",
+      "name": "Ekstrak IDCloudHost"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        864,
+        208
+      ],
+      "id": "b6a93783-a76e-4dcf-a683-a0ab3c3cb7a0",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1sAHufgWihX4aGg_1ktDQePYhgV34HstcqtIBxduGqtY",
+          "mode": "list",
+          "cachedResultName": "Tugas 2 Pertemuan 2 Implementasi AI untuk Keuangan_20 Oktober 2026",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1sAHufgWihX4aGg_1ktDQePYhgV34HstcqtIBxduGqtY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1sAHufgWihX4aGg_1ktDQePYhgV34HstcqtIBxduGqtY/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Tanggal": "={{ $json.tanggal }}",
+            "Merchant": "={{ $json.merchant }}",
+            "Nominal": "={{ $json.nominal }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Tanggal",
+              "displayName": "Tanggal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Merchant",
+              "displayName": "Merchant",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nominal",
+              "displayName": "Nominal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        208
+      ],
+      "id": "8c98338c-9e78-486d-bd2d-5997ee2a0f13",
+      "name": "Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "x7n1EiIowi8BG9uO",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Email Trigger (IMAP)": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Ekstrak Grab",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ekstrak Tokopedia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ekstrak IDCloudHost",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ekstrak Grab": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ekstrak Tokopedia": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Ekstrak IDCloudHost": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "ba785b44-e46b-4423-b923-e0de46332ab2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "dc96f10ae7dc95d3c138575ba243a0a167923dbcb524841d451aadf9135d5fb3"
+  },
+  "nodeGroups": [],
+  "id": "CbWDsRuJKRW6Ht5h",
+  "tags": []
+}
