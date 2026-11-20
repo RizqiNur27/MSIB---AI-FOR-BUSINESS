@@ -1,0 +1,340 @@
+{
+  "name": "Tugas Pertemuan 5 Implementasi AI untuk Keuangan_23 Oktober 2026",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "891234a5-f5d0-4e73-8ff5-b3a5446138f2",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.cnbcindonesia.com/market/rss",
+        "options": {}
+      },
+      "id": "405fd738-a65e-4571-b2f0-41f0c4154385",
+      "name": "CNBC Indonesia RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        256,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://finance.detik.com/rss",
+        "options": {}
+      },
+      "id": "27ece8d3-4c80-4b67-ad3f-c915355a2afc",
+      "name": "Finance Detik RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        256,
+        272
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "5fbfd9bb-cf13-453c-b639-57c17329a00e",
+      "name": "Menggabungkan 2 Output RSS",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        544,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "maxItems": 10
+      },
+      "id": "31966849-a48b-416a-a06b-c53901ec8f11",
+      "name": "Membatasi hanya 10",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        784,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.link }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "c8bf8c2b-ece5-4325-ad0c-c936eb96039f",
+      "name": "Unduh halaman web dari setiap URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1024,
+        128
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "text",
+              "cssSelector": ".detail__body-text, .detail-text"
+            }
+          ]
+        },
+        "options": {
+          "trimValues": true,
+          "cleanUpText": true
+        }
+      },
+      "id": "192c0a7e-ca3d-4414-bdd9-fd46e386ad8b",
+      "name": "Clean kode HTML dan Ekstrak",
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        208,
+        496
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "text"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "85d8d42d-9ad1-46f5-b3ed-d051e6496e0c",
+      "name": "Menggabungkan menjadi 1 blok teks besar",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        528,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Berikut kumpulan berita keuangan hari ini:\n\n{{ $json.text.join('\\n\\n---\\n\\n') }}\n\nTulis 5 Poin Utama Pergerakan Pasar Hari Ini sesuai format yang ditentukan.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Peran: Anda adalah analis pasar keuangan senior di Indonesia yang menulis briefing pagi untuk tim investasi.\n\nTugas: Dari kumpulan berita yang diberikan, tulis ringkasan berjudul \"5 Poin Utama Pergerakan Pasar Hari Ini\".\n\nFormat keluaran:\n- Baris pertama: 5 Poin Utama Pergerakan Pasar Hari Ini\n- Lalu tepat 5 poin bernomor 1 sampai 5.\n- Tiap poin berisi satu kalimat inti, dilanjutkan satu atau dua kalimat penjelasan singkat. Sebutkan angka, nama emiten, atau indikator penting bila ada di berita.\n- Bahasa Indonesia formal, ringkas, dan total tidak lebih dari 1.200 karakter.\n\nBatasan:\n- Gunakan hanya informasi dari berita yang diberikan. Jangan mengarang angka atau fakta.\n- Gabungkan berita yang membahas topik yang sama menjadi satu poin.\n- Urutkan dari yang paling berdampak bagi pasar.\n- Jangan memakai markdown, tanda bintang, atau pembuka dan penutup."
+            }
+          ]
+        }
+      },
+      "id": "072f161e-18e6-4535-a19f-5b697ca3727d",
+      "name": "Basic LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        784,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "model": "openrouter/free",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "18deff9e-2863-4084-bf36-b452982d331c",
+      "name": "OpenRouter Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        784,
+        672
+      ],
+      "credentials": {
+        "openRouterApi": {
+          "id": "tj2Uro0xdnZL6UL5",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "7091419525",
+        "text": "={{ '📰 Briefing Pagi - ' + $now.setLocale('id').toFormat('cccc, d LLLL yyyy') + '\\n\\n' + $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "fd520b27-4d0f-4a05-bcfc-3df4baf05131",
+      "name": "Send a text message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1056,
+        496
+      ],
+      "webhookId": "58bd10fc-5213-4693-a597-222df3d693e3",
+      "credentials": {
+        "telegramApi": {
+          "id": "Bi3u8rkLbQdgUOu7",
+          "name": "Telegram account 3"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "CNBC Indonesia RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Finance Detik RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CNBC Indonesia RSS": {
+      "main": [
+        [
+          {
+            "node": "Menggabungkan 2 Output RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finance Detik RSS": {
+      "main": [
+        [
+          {
+            "node": "Menggabungkan 2 Output RSS",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Menggabungkan 2 Output RSS": {
+      "main": [
+        [
+          {
+            "node": "Membatasi hanya 10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Membatasi hanya 10": {
+      "main": [
+        [
+          {
+            "node": "Unduh halaman web dari setiap URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unduh halaman web dari setiap URL": {
+      "main": [
+        [
+          {
+            "node": "Clean kode HTML dan Ekstrak",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean kode HTML dan Ekstrak": {
+      "main": [
+        [
+          {
+            "node": "Menggabungkan menjadi 1 blok teks besar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Menggabungkan menjadi 1 blok teks besar": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "f29ada7c-cb1c-4de6-bcee-a5e2ee221073",
+  "meta": {
+    "instanceId": "dc96f10ae7dc95d3c138575ba243a0a167923dbcb524841d451aadf9135d5fb3"
+  },
+  "nodeGroups": [],
+  "id": "MngjN6rfmpDjj5yi",
+  "tags": []
+}
