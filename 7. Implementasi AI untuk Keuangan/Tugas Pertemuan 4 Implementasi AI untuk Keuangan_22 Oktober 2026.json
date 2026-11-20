@@ -1,0 +1,356 @@
+{
+  "name": "Tugas Pertemuan 4 Implementasi AI untuk Keuangan_22 Oktober 2026",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "8f159ad7-23c9-4420-bbcb-bb0d2881de1b",
+      "name": "When clicking 'Execute workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1RtBOkza15DtowvEszPhvJKzS9ii4YD2MrjyD92pO2GU",
+          "mode": "list",
+          "cachedResultName": "Dummy_Rekonsiliasi_Tugas_4",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1RtBOkza15DtowvEszPhvJKzS9ii4YD2MrjyD92pO2GU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1490109736,
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1RtBOkza15DtowvEszPhvJKzS9ii4YD2MrjyD92pO2GU/edit#gid=1490109736"
+        },
+        "options": {}
+      },
+      "id": "86c3705e-abba-4664-ac3a-0e72c9758098",
+      "name": "Data Internal",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        256,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "x7n1EiIowi8BG9uO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "1wiCewXHKXB7SYlDHCPsD277D_bOBevgS",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "7fad7c5e-85ed-414d-a5b9-49992df4779e",
+      "name": "Data Bank",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        256,
+        320
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "ZviVuqH9gQNOwZbb",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "8c3858a9-a266-4015-82f1-172fa2ba45cf",
+      "name": "Ekstrak CSV Bank",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        528,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// CODE NODE: CLEAN INTERNAL DATA\n// ===== KONFIGURASI NAMA KOLOM (ubah di sini bila nama kolom pada sheet/CSV Anda berbeda) =====\nconst KOL_TANGGAL   = ['Tanggal Transaksi', 'Tanggal', 'Date', 'Tgl'];\nconst KOL_NOMINAL   = ['Jumlah (IDR)', 'Jumlah', 'Nominal', 'Amount', 'Jumlah Transaksi'];\nconst KOL_DESKRIPSI = ['Deskripsi', 'Deskripsi Transaksi', 'Keterangan', 'Uraian', 'Description', 'Catatan'];\nconst KOL_ID        = ['ID Referensi', 'ID Transaksi Bank', 'ID Transaksi', 'Referensi', 'ID', 'No. Transaksi'];\n// ==========================================================================================\n\nconst norm = s => String(s).replace(/^\\uFEFF/, '').trim().toLowerCase();\nconst pad = n => String(n).padStart(2, '0');\n\n// Ambil nilai kolom berdasarkan daftar kemungkinan nama (tidak peka huruf besar/kecil, spasi & BOM diabaikan)\nfunction pick(row, candidates) {\n  const map = {};\n  Object.keys(row).forEach(k => { map[norm(k)] = k; });\n  for (const c of candidates) {\n    const k = map[norm(c)];\n    if (k !== undefined) return { found: true, key: k, value: row[k] };\n  }\n  return { found: false, key: null, value: undefined };\n}\n\n// Standardisasi tanggal menjadi YYYY-MM-DD (format lokal Indonesia: DD/MM/YYYY)\nfunction cleanDate(raw) {\n  if (raw === null || raw === undefined || raw === '') return '';\n  if (typeof raw === 'number' && raw > 20000 && raw < 80000) {          // nomor seri Excel/Sheets\n    return new Date(Math.round((raw - 25569) * 86400 * 1000)).toISOString().slice(0, 10);\n  }\n  const s = String(raw).trim();\n  const iso = s.match(/^(\\d{4})[-\\/.](\\d{1,2})[-\\/.](\\d{1,2})/);        // YYYY-MM-DD\n  if (iso) return `${iso[1]}-${pad(iso[2])}-${pad(iso[3])}`;\n  const dmy = s.match(/^(\\d{1,2})[-\\/.](\\d{1,2})[-\\/.](\\d{2,4})/);      // DD/MM/YYYY\n  if (dmy) {\n    const y = dmy[3].length === 2 ? '20' + dmy[3] : dmy[3];\n    return `${y}-${pad(dmy[2])}-${pad(dmy[1])}`;\n  }\n  return '';\n}\n\n// Hapus semua karakter non-angka (Rp, titik, koma, spasi) -> angka murni\nfunction cleanAmount(raw) {\n  if (raw === null || raw === undefined || raw === '') return null;\n  let s = String(raw).trim();\n  s = s.replace(/[.,]\\d{1,2}$/, '');          // buang desimal di ujung, mis. \",00\" atau \".50\"\n  const digits = s.replace(/\\D/g, '');\n  return digits === '' ? null : parseInt(digits, 10);\n}\n// Tipe transaksi yang diproses (kolom tipe boleh tidak ada; bila ada, baris lain dilewati)\nconst KOL_TIPE = ['Tipe Transaksi', 'Tipe', 'Jenis Transaksi'];\nconst TIPE_VALID = ['pembayaran', 'pengeluaran', 'penerimaan'];\n\nconst results = [];\nconst all = $input.all();\n\nall.forEach((item, idx) => {\n  const row = item.json;\n\n  // 1. Filter tipe transaksi\n  const tipe = pick(row, KOL_TIPE);\n  if (tipe.found && String(tipe.value || '').trim() !== '' &&\n      !TIPE_VALID.includes(String(tipe.value).trim().toLowerCase())) return;\n\n  // 2. Standardisasi tanggal -> YYYY-MM-DD\n  const tgl = pick(row, KOL_TANGGAL);\n  const nom = pick(row, KOL_NOMINAL);\n  if (idx === 0 && !tgl.found) throw new Error('Kolom tanggal tidak ditemukan. Kolom yang ada: ' + Object.keys(row).join(', '));\n  if (idx === 0 && !nom.found) throw new Error('Kolom nominal tidak ditemukan. Kolom yang ada: ' + Object.keys(row).join(', '));\n\n  const cleanedDate = cleanDate(tgl.value);\n  // 3. Pembersihan nominal -> angka murni\n  const cleanedAmount = cleanAmount(nom.value);\n\n  // 4. match_key = tanggal_nominal (baris yang tidak valid diberi kunci unik agar tampil sebagai selisih)\n  const valid = cleanedDate !== '' && cleanedAmount !== null;\n  const match_key = valid ? `${cleanedDate}_${cleanedAmount}` : `TIDAK_VALID_INTERNAL_${idx + 2}`;\n\n  results.push({ json: {\n    sumber: 'INTERNAL',\n    match_key,\n    tanggal: cleanedDate,\n    nominal: cleanedAmount,\n    tipe: tipe.found ? String(tipe.value || '').trim() : '',\n    deskripsi: String(pick(row, KOL_DESKRIPSI).value || '').trim(),\n    referensi: String(pick(row, KOL_ID).value || '').trim(),\n    baris_asal: idx + 2\n  }});\n});\n\nreturn results;\n"
+      },
+      "id": "ffc7de99-6eea-46b3-9ee4-8bb95b2748b4",
+      "name": "Clean Internal Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// CODE NODE: CLEAN BANK DATA\n// ===== KONFIGURASI NAMA KOLOM (ubah di sini bila nama kolom pada sheet/CSV Anda berbeda) =====\nconst KOL_TANGGAL   = ['Tanggal Bank', 'Tanggal', 'Tanggal Transaksi', 'Date', 'Tgl'];\nconst KOL_NOMINAL   = ['Jumlah (IDR)', 'Jumlah', 'Nominal', 'Amount', 'Jumlah Transaksi'];\nconst KOL_DESKRIPSI = ['Deskripsi', 'Deskripsi Transaksi', 'Keterangan', 'Uraian', 'Description', 'Catatan'];\nconst KOL_ID        = ['ID Referensi', 'ID Transaksi Bank', 'ID Transaksi', 'Referensi', 'ID', 'No. Transaksi'];\n// ==========================================================================================\n\nconst norm = s => String(s).replace(/^\\uFEFF/, '').trim().toLowerCase();\nconst pad = n => String(n).padStart(2, '0');\n\n// Ambil nilai kolom berdasarkan daftar kemungkinan nama (tidak peka huruf besar/kecil, spasi & BOM diabaikan)\nfunction pick(row, candidates) {\n  const map = {};\n  Object.keys(row).forEach(k => { map[norm(k)] = k; });\n  for (const c of candidates) {\n    const k = map[norm(c)];\n    if (k !== undefined) return { found: true, key: k, value: row[k] };\n  }\n  return { found: false, key: null, value: undefined };\n}\n\n// Standardisasi tanggal menjadi YYYY-MM-DD (format lokal Indonesia: DD/MM/YYYY)\nfunction cleanDate(raw) {\n  if (raw === null || raw === undefined || raw === '') return '';\n  if (typeof raw === 'number' && raw > 20000 && raw < 80000) {          // nomor seri Excel/Sheets\n    return new Date(Math.round((raw - 25569) * 86400 * 1000)).toISOString().slice(0, 10);\n  }\n  const s = String(raw).trim();\n  const iso = s.match(/^(\\d{4})[-\\/.](\\d{1,2})[-\\/.](\\d{1,2})/);        // YYYY-MM-DD\n  if (iso) return `${iso[1]}-${pad(iso[2])}-${pad(iso[3])}`;\n  const dmy = s.match(/^(\\d{1,2})[-\\/.](\\d{1,2})[-\\/.](\\d{2,4})/);      // DD/MM/YYYY\n  if (dmy) {\n    const y = dmy[3].length === 2 ? '20' + dmy[3] : dmy[3];\n    return `${y}-${pad(dmy[2])}-${pad(dmy[1])}`;\n  }\n  return '';\n}\n\n// Hapus semua karakter non-angka (Rp, titik, koma, spasi) -> angka murni\nfunction cleanAmount(raw) {\n  if (raw === null || raw === undefined || raw === '') return null;\n  let s = String(raw).trim();\n  s = s.replace(/[.,]\\d{1,2}$/, '');          // buang desimal di ujung, mis. \",00\" atau \".50\"\n  const digits = s.replace(/\\D/g, '');\n  return digits === '' ? null : parseInt(digits, 10);\n}\nconst results = [];\nconst all = $input.all();\n\nall.forEach((item, idx) => {\n  const row = item.json;\n\n  // 1. Standardisasi tanggal bank -> YYYY-MM-DD\n  const tgl = pick(row, KOL_TANGGAL);\n  const nom = pick(row, KOL_NOMINAL);\n  if (idx === 0 && !tgl.found) throw new Error('Kolom tanggal bank tidak ditemukan. Kolom yang ada: ' + Object.keys(row).join(', '));\n  if (idx === 0 && !nom.found) throw new Error('Kolom nominal bank tidak ditemukan. Kolom yang ada: ' + Object.keys(row).join(', '));\n\n  const cleanedDate = cleanDate(tgl.value);\n  // 2. Hapus pemisah ribuan & karakter non-angka\n  const cleanedAmount = cleanAmount(nom.value);\n\n  // 3. match_key identik dengan data internal\n  const valid = cleanedDate !== '' && cleanedAmount !== null;\n  const match_key = valid ? `${cleanedDate}_${cleanedAmount}` : `TIDAK_VALID_BANK_${idx + 2}`;\n\n  results.push({ json: {\n    sumber: 'BANK',\n    match_key,\n    tanggal: cleanedDate,\n    nominal: cleanedAmount,\n    tipe: '',\n    deskripsi: String(pick(row, KOL_DESKRIPSI).value || '').trim(),\n    referensi: String(pick(row, KOL_ID).value || '').trim(),\n    baris_asal: idx + 2\n  }});\n});\n\nreturn results;\n"
+      },
+      "id": "aced6602-50c5-468b-8fcb-d18ce73748e3",
+      "name": "Clean Bank Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        784,
+        320
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "cbc3049f-1482-4572-81e3-77370b98e42d",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1040,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// CODE NODE: ANALISA REKONSILIASI\n// Status: MATCHED | MISSING IN BANK (ada di internal, tidak ada di bank) | UNRECORDED INTERNAL (ada di bank, tidak ada di internal)\nconst items = $input.all();\n\n// 1. Kelompokkan berdasarkan match_key\nconst grouped = {};\nfor (const item of items) {\n  const j = item.json;\n  if (!grouped[j.match_key]) grouped[j.match_key] = { INTERNAL: [], BANK: [] };\n  grouped[j.match_key][j.sumber].push(j);\n}\n\n// 2. Tentukan status. Bila satu kunci muncul beberapa kali, dipasangkan satu-satu;\n//    sisa di salah satu sisi dianggap selisih.\nconst results = [];\nfor (const key of Object.keys(grouped)) {\n  const internal = grouped[key].INTERNAL;\n  const bank = grouped[key].BANK;\n  const pairs = Math.min(internal.length, bank.length);\n\n  for (let i = 0; i < pairs; i++) {\n    results.push({ Status: 'MATCHED', Prioritas: 'Low', Pesan: '✅ Data klop (Cocok).',\n      Tanggal: internal[i].tanggal, Nominal: internal[i].nominal, match_key: key,\n      Ref_Internal: internal[i].referensi || 'N/A', Ref_Bank: bank[i].referensi || 'N/A',\n      Deskripsi: internal[i].deskripsi || bank[i].deskripsi || '-',\n      Deskripsi_Internal: internal[i].deskripsi, Deskripsi_Bank: bank[i].deskripsi,\n      Baris_Internal: internal[i].baris_asal, Baris_Bank: bank[i].baris_asal });\n  }\n  for (let i = pairs; i < internal.length; i++) {\n    results.push({ Status: 'MISSING IN BANK', Prioritas: 'High', Pesan: '⚠️ Tercatat di Internal, tapi tidak ada di Bank.',\n      Tanggal: internal[i].tanggal, Nominal: internal[i].nominal, match_key: key,\n      Ref_Internal: internal[i].referensi || 'N/A', Ref_Bank: 'N/A',\n      Deskripsi: internal[i].deskripsi || '-',\n      Deskripsi_Internal: internal[i].deskripsi, Deskripsi_Bank: '',\n      Baris_Internal: internal[i].baris_asal, Baris_Bank: '' });\n  }\n  for (let i = pairs; i < bank.length; i++) {\n    results.push({ Status: 'UNRECORDED INTERNAL', Prioritas: 'Medium', Pesan: '⚠️ Ada di Bank, tapi tidak tercatat di Internal.',\n      Tanggal: bank[i].tanggal, Nominal: bank[i].nominal, match_key: key,\n      Ref_Internal: 'N/A', Ref_Bank: bank[i].referensi || 'N/A',\n      Deskripsi: bank[i].deskripsi || '-',\n      Deskripsi_Internal: '', Deskripsi_Bank: bank[i].deskripsi,\n      Baris_Internal: '', Baris_Bank: bank[i].baris_asal });\n  }\n}\n\n// 3. Urutkan: selisih lebih dulu, lalu berdasarkan tanggal\nconst urutan = { 'MISSING IN BANK': 0, 'UNRECORDED INTERNAL': 1, 'MATCHED': 2 };\nresults.sort((a, b) => (urutan[a.Status] - urutan[b.Status]) || String(a.Tanggal).localeCompare(String(b.Tanggal)));\n\nreturn results.map(r => ({ json: r }));\n"
+      },
+      "id": "36a47a84-9ef6-42e7-9778-2e3cea90a62e",
+      "name": "Analisa Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4f224873-4d0f-4bd7-9a9d-08456c0a5d52",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "MATCHED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4335effd-46e1-4e21-9dae-8ae620ff5c0e",
+      "name": "Cek Status Match",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1520,
+        160
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "687cafad-a2c6-4c03-b1ac-b0061ba11658",
+      "name": "Semua Cocok (Tanpa Notifikasi)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// CODE NODE: SUSUN PESAN SELISIH (hanya menerima transaksi yang TIDAK COCOK dari node Cek Status Match)\nconst bad = $input.all().map(i => i.json);\n\n// Ambil seluruh hasil analisa untuk ringkasan (termasuk yang MATCHED)\nlet semua = bad;\ntry { semua = $('Analisa Status').all().map(i => i.json); } catch (e) {}\n\nconst rp = n => 'Rp' + String(Math.round(n || 0)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.');\nconst jumlah = (arr) => arr.reduce((s, r) => s + (Number(r.Nominal) || 0), 0);\n\nconst matched   = semua.filter(r => r.Status === 'MATCHED');\nconst missing   = bad.filter(r => r.Status === 'MISSING IN BANK');\nconst unrecord  = bad.filter(r => r.Status === 'UNRECORDED INTERNAL');\n\nlet waktu;\ntry { waktu = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'long', timeStyle: 'short' }); }\ncatch (e) { waktu = new Date().toISOString(); }\n\nconst selisih = jumlah(missing) - jumlah(unrecord); // total internal - total bank (untuk transaksi yang tidak cocok)\n\nconst header = [\n  '🚨 LAPORAN REKONSILIASI - ADA SELISIH',\n  `🕒 ${waktu}`,\n  '',\n  `✅ Matched: ${matched.length} transaksi`,\n  `❗ Missing in Bank: ${missing.length} transaksi (${rp(jumlah(missing))})`,\n  `❗ Unrecorded Internal: ${unrecord.length} transaksi (${rp(jumlah(unrecord))})`,\n  `📉 Selisih (Internal - Bank): ${selisih < 0 ? '-' : ''}${rp(Math.abs(selisih))}`,\n].join('\\n');\n\nconst baris = [];\nconst tulis = (judul, arr, kolRef) => {\n  if (!arr.length) return;\n  baris.push('', judul);\n  arr.forEach((r, i) => baris.push(`${i + 1}. ${r.Tanggal || '-'} | ${rp(r.Nominal)} | ${r[kolRef]} | ${r.Deskripsi || '-'}`));\n};\ntulis('--- MISSING IN BANK (ada di internal, tidak ada di bank) ---', missing, 'Ref_Internal');\ntulis('--- UNRECORDED INTERNAL (ada di bank, tidak ada di internal) ---', unrecord, 'Ref_Bank');\n\n// Pecah menjadi beberapa pesan bila melebihi batas Telegram (4096 karakter)\nconst BATAS = 3500;\nconst potongan = [];\nlet sekarang = header;\nfor (const ln of baris) {\n  if ((sekarang + '\\n' + ln).length > BATAS) { potongan.push(sekarang); sekarang = '(lanjutan)'; }\n  sekarang += '\\n' + ln;\n}\npotongan.push(sekarang);\n\nreturn potongan.map((text, i) => ({ json: { text, bagian: i + 1, dari: potongan.length } }));\n"
+      },
+      "id": "b3f94ca1-5485-4e64-b57f-aaa045ce67e0",
+      "name": "Susun Pesan Selisih",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "7091419525",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "177e6ab0-d7b2-4c5a-8925-35951729d630",
+      "name": "Kirim Laporan",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2048,
+        320
+      ],
+      "webhookId": "5c7b1767-0438-4d9f-b897-b9f17f5c8cfe",
+      "credentials": {
+        "telegramApi": {
+          "id": "Bi3u8rkLbQdgUOu7",
+          "name": "Telegram account 3"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Data Internal",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Data Bank",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Internal": {
+      "main": [
+        [
+          {
+            "node": "Clean Internal Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Bank": {
+      "main": [
+        [
+          {
+            "node": "Ekstrak CSV Bank",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ekstrak CSV Bank": {
+      "main": [
+        [
+          {
+            "node": "Clean Bank Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Internal Data": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Bank Data": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Analisa Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analisa Status": {
+      "main": [
+        [
+          {
+            "node": "Cek Status Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cek Status Match": {
+      "main": [
+        [
+          {
+            "node": "Semua Cocok (Tanpa Notifikasi)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Susun Pesan Selisih",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Susun Pesan Selisih": {
+      "main": [
+        [
+          {
+            "node": "Kirim Laporan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "4008afa3-47bb-4bdc-bdac-22bc83ebc0db",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "dc96f10ae7dc95d3c138575ba243a0a167923dbcb524841d451aadf9135d5fb3"
+  },
+  "nodeGroups": [],
+  "id": "ukhFfBB9Iyh3YAKM",
+  "tags": []
+}
