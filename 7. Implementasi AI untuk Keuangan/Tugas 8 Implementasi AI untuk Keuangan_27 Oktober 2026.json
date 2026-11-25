@@ -1,0 +1,477 @@
+{
+  "name": "Tugas 8 Implementasi AI untuk Keuangan_27 Oktober 2026",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "d9898b06-1fb4-4e64-a7a3-80908a29de12",
+      "name": "Tiap 15 menit",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        160,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "endpointUrl": "https://mcp.xpoz.ai/mcp",
+        "authentication": "bearerAuth",
+        "tool": {
+          "__rl": true,
+          "value": "getTwitterPostsByKeywords",
+          "mode": "list",
+          "cachedResultName": "getTwitterPostsByKeywords"
+        },
+        "inputMode": "json",
+        "jsonInput": "{\n  \"query\": \"\\\"$BTC\\\" OR \\\"$ETH\\\"\",\n  \"language\": \"en\",\n  \"filterOutRetweets\": true,\n  \"sortBy\": \"latest\",\n  \"responseType\": \"fast\",\n  \"limit\": 10,\n  \"fields\": [\n    \"id\",\n    \"text\",\n    \"authorUsername\",\n    \"createdAt\",\n    \"createdAtDate\"\n  ]\n}",
+        "options": {}
+      },
+      "id": "4ec569dc-baca-4eb7-8d07-ca37e1d7054d",
+      "name": "Pengambil Data",
+      "type": "@n8n/n8n-nodes-langchain.mcpClient",
+      "typeVersion": 1,
+      "position": [
+        400,
+        48
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "BbkEpulp2SdaRZ1L",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Rapikan Data Tweet (Code, Run Once for All Items)\n// Hasil node Pengambil Data (Xpoz MCP) berupa teks. Kode ini memecahnya\n// menjadi satu item per tweet: id, text, penulis, waktu pengambilan.\n// Format teks yang didukung:\n//   1) JSON biasa\n//   2) TOON tabel   : results[10]{id,text,authorUsername,...}:  lalu 10 baris nilai\n//   3) TOON daftar  : results[2]:  lalu blok \"- id: ...\" (dipakai bila kolom antar tweet tidak seragam)\n//   4) hasil kosong : results: []  atau  results[0]...  (workflow berhenti tanpa error)\n\nconst waktuAmbil = DateTime.now().setZone('Asia/Jakarta').toFormat('yyyy-MM-dd HH:mm:ss');\n\n// ---------- JSON: cari array tweet (objek yang punya \"id\" DAN \"text\") ----------\nlet adaStrukturKosong = false;\nfunction cariTweet(node, depth = 0) {\n  if (Array.isArray(node)) {\n    if (node.length && node[0] && typeof node[0] === 'object' && ('id' in node[0]) && ('text' in node[0])) return node;\n    for (const v of node) { const r = cariTweet(v, depth + 1); if (r) return r; }\n    return null;\n  }\n  if (node && typeof node === 'object' && depth < 6) {\n    for (const key of ['results', 'data', 'posts', 'items', 'tweets']) {\n      if (Array.isArray(node[key]) && node[key].length === 0) { adaStrukturKosong = true; }\n    }\n    for (const v of Object.values(node)) { const r = cariTweet(v, depth + 1); if (r) return r; }\n  }\n  return null;\n}\n\n// ---------- nilai TOON: bertanda kutip (dengan escape) atau polos ----------\nfunction bacaKutip(s, i) {            // s[i] adalah tanda kutip pembuka; kembalikan [nilai, indeksSesudahKutipPenutup]\n  let v = '';\n  i++;\n  while (i < s.length) {\n    const ch = s[i];\n    if (ch === '\\\\') {\n      const nx = s[i + 1];\n      v += nx === 'n' ? '\\n' : nx === 't' ? '\\t' : nx === 'r' ? '\\r' : nx;\n      i += 2; continue;\n    }\n    if (ch === '\"') { i++; break; }\n    v += ch; i++;\n  }\n  return [v, i];\n}\nconst bersih = (v) => (v === 'null' ? '' : v);\n\n// ---------- TOON tabel ----------\nfunction parseTabel(text) {\n  const hasil = [];\n  const re = /(\\w+)\\[(\\d+)([|\\t]?)\\]\\{([^}]*)\\}:/g;\n  let m;\n  while ((m = re.exec(text)) !== null) {\n    const pemisah = m[3] === '|' ? '|' : (m[3] === '\\t' ? '\\t' : ',');\n    const kolom = m[4].split(/[,|\\t]/).map(s => s.trim());   // nama kolom tidak pernah memuat pemisah\n    const jumlah = parseInt(m[2], 10);\n    let i = re.lastIndex;\n    for (let r = 0; r < jumlah; r++) {\n      while (i < text.length && /[ \\t\\r\\n]/.test(text[i]) && text[i] !== pemisah) i++;\n      if (i >= text.length) break;\n      const nilai = [];\n      for (let c = 0; c < kolom.length; c++) {\n        let v = '';\n        if (text[i] === '\"') { [v, i] = bacaKutip(text, i); }\n        else {\n          while (i < text.length && text[i] !== pemisah && text[i] !== '\\n') { v += text[i]; i++; }\n          v = bersih(v.trim());\n        }\n        nilai.push(v);\n        if (text[i] === pemisah) i++;\n      }\n      const obj = {};\n      kolom.forEach((k, idx) => { obj[k] = nilai[idx]; });\n      hasil.push(obj);\n    }\n    re.lastIndex = i;\n  }\n  return hasil;\n}\n\n// ---------- TOON daftar ----------\nfunction parseDaftar(text) {\n  const hasil = [];\n  const baris = text.split('\\n');\n  for (let b = 0; b < baris.length; b++) {\n    const h = baris[b].match(/^(\\s*)(\\w+)\\[(\\d+)[|\\t]?\\]:\\s*$/);          // judul array tanpa kurung kurawal\n    if (!h) continue;\n    const indentJudul = h[1].length;\n    let obj = null;\n    for (b = b + 1; b < baris.length; b++) {\n      const ln = baris[b];\n      if (!ln.trim()) continue;\n      const indent = ln.match(/^\\s*/)[0].length;\n      if (indent <= indentJudul) { b--; break; }                           // array selesai\n      let isi = ln.trim();\n      if (isi.startsWith('- ')) { if (obj) hasil.push(obj); obj = {}; isi = isi.slice(2); }\n      if (!obj) continue;\n      const kv = isi.match(/^(\\w+)(?:\\[\\d+[|\\t]?\\])?:\\s*(.*)$/);\n      if (!kv) continue;\n      let v = kv[2];\n      if (v.startsWith('\"')) { [v] = bacaKutip(v, 0); } else { v = bersih(v.trim()); }\n      obj[kv[1]] = v;\n    }\n    if (obj) hasil.push(obj);\n  }\n  return hasil.filter(o => 'id' in o && 'text' in o);\n}\n\n// ---------- baca semua hasil node sebelumnya ----------\nconst semua = [];\nlet teksSemua = '';\nfor (const item of $input.all()) {\n  const sumber = [];\n  if (item.json.structuredContent) sumber.push(item.json.structuredContent);\n  for (const c of (item.json.content || [])) {\n    if (!c || typeof c.text !== 'string') continue;\n    teksSemua += c.text + '\\n';\n    if (item.json.isError) throw new Error('Xpoz mengembalikan error: ' + c.text.slice(0, 300));\n    let json = null;\n    try { json = JSON.parse(c.text); } catch (e) { /* bukan JSON */ }\n    if (json !== null) { sumber.push(json); continue; }\n    const tabel = parseTabel(c.text);\n    semua.push(...(tabel.length ? tabel : parseDaftar(c.text)));\n  }\n  for (const s of sumber) { const r = cariTweet(s); if (r) semua.push(...r); }\n}\n\nif (semua.length === 0) {\n  // hasil kosong yang sah: JSON kosong, \"results: []\", atau \"results[0]\"\n  if (adaStrukturKosong || /\\w+\\s*:\\s*\\[\\s*\\]/.test(teksSemua) || /\\w+\\[0[|\\t]?\\]/.test(teksSemua)) return [];\n  throw new Error('Format hasil Xpoz tidak dikenali. Cuplikan: ' + (teksSemua || JSON.stringify($input.first().json)).slice(0, 300));\n}\n\n// ---------- satu item per tweet ----------\nconst dilihat = new Set();\nconst out = [];\nfor (const t of semua) {\n  const idTweet = String(t.id || '');\n  const teks = String(t.text || '').replace(/\\s+/g, ' ').trim();\n  if (!idTweet || !teks || dilihat.has(idTweet)) continue;            // buang kosong dan duplikat\n  dilihat.add(idTweet);\n  out.push({ json: { id: idTweet, text: teks, penulis: bersih(String(t.authorUsername || '')), waktu: waktuAmbil } });\n}\nreturn out;\n"
+      },
+      "id": "c40a7d92-02f4-4b6d-9ab1-f4d0da1fcc98",
+      "name": "Rapikan Data Tweet",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze the sentiment of the following tweet. Respond ONLY with ONE word: 'Positive', 'Negative', or 'Neutral'. Do not add any explanation or punctuation.\n\nTweet:\n{{ $json.text }}",
+        "batching": {}
+      },
+      "id": "9668e52c-250d-4557-8e8e-06a0a633c57c",
+      "name": "Analisis Sentimen",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        880,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "model": "openrouter/free",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "id": "9cd6766f-4754-462f-bc93-a0af26f37758",
+      "name": "OpenRouter Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        896,
+        272
+      ],
+      "credentials": {
+        "openRouterApi": {
+          "id": "tj2Uro0xdnZL6UL5",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "16Ur3ls65TKfmcVSgFEHeWNpUObFHAg3rZlVF27xa4Y4",
+          "mode": "list",
+          "cachedResultName": "Database Sentimen BTC ETH_Tugas 8",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16Ur3ls65TKfmcVSgFEHeWNpUObFHAg3rZlVF27xa4Y4/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Data Mentah",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16Ur3ls65TKfmcVSgFEHeWNpUObFHAg3rZlVF27xa4Y4/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Waktu": "={{ $('Rapikan Data Tweet').item.json.waktu }}",
+            "ID_Tweet": "={{ $('Rapikan Data Tweet').item.json.id }}",
+            "Teks": "={{ $('Rapikan Data Tweet').item.json.text }}",
+            "Sentiment": "={{ (['Positive','Negative','Neutral'].map(w => [String($json.text).toLowerCase().indexOf(w.toLowerCase()), w]).filter(x => x[0] >= 0).sort((a, b) => a[0] - b[0])[0] || [0, 'Neutral'])[1] }}"
+          },
+          "matchingColumns": [
+            "ID_Tweet"
+          ],
+          "schema": [
+            {
+              "id": "Waktu",
+              "displayName": "Waktu",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ID_Tweet",
+              "displayName": "ID_Tweet",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Teks",
+              "displayName": "Teks",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Sentiment",
+              "displayName": "Sentiment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "ff2257c6-d640-433a-b705-1378a9a007a3",
+      "name": "Penyimpanan Hasil",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        48
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "x7n1EiIowi8BG9uO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "6fe56fbb-893a-4192-9965-d036e237a603",
+      "name": "Tiap jam 7 pagi",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        160,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "16Ur3ls65TKfmcVSgFEHeWNpUObFHAg3rZlVF27xa4Y4",
+          "mode": "list",
+          "cachedResultName": "Database Sentimen BTC ETH_Tugas 8",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16Ur3ls65TKfmcVSgFEHeWNpUObFHAg3rZlVF27xa4Y4/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Data Mentah",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16Ur3ls65TKfmcVSgFEHeWNpUObFHAg3rZlVF27xa4Y4/edit#gid=0"
+        },
+        "options": {}
+      },
+      "id": "6f46560b-d277-4958-b108-707e83e42d72",
+      "name": "Baca Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        400,
+        560
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "x7n1EiIowi8BG9uO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Analisis Data (Code, Run Once for All Items)\n// Menghitung total tweet, jumlah per sentimen, dan persentase dominasi\n// dari data pada sheet \"Data Mentah\".\n\nconst WINDOW_HOURS = 24;                       // hanya data 24 jam terakhir\nconst rows = $input.all().map(i => i.json).filter(r => r && r.Sentiment);\nconst now = DateTime.now().setZone('Asia/Jakarta');\n\nfunction parseWaktu(v) {\n  if (!v) return null;\n  let d = DateTime.fromFormat(String(v), 'yyyy-MM-dd HH:mm:ss', { zone: 'Asia/Jakarta' });\n  if (!d.isValid) d = DateTime.fromISO(String(v), { zone: 'Asia/Jakarta' });\n  return d.isValid ? d : null;\n}\n\nlet periode = '24 jam terakhir';\nlet terpilih = rows.filter(r => {\n  const d = parseWaktu(r.Waktu);\n  return !d || now.diff(d, 'hours').hours <= WINDOW_HOURS;   // baris tanpa waktu valid tetap dihitung\n});\nif (terpilih.length === 0 && rows.length > 0) {\n  terpilih = rows;\n  periode = 'seluruh data tersimpan (tidak ada data 24 jam terakhir)';\n}\n\nlet positive = 0, negative = 0, neutral = 0;\nfor (const r of terpilih) {\n  const s = String(r.Sentiment).trim().toLowerCase();\n  if (s === 'positive') positive++;\n  else if (s === 'negative') negative++;\n  else if (s === 'neutral') neutral++;\n}\nconst total = positive + negative + neutral;\n\nconst persen = (n) => (total ? Math.round((n / total) * 1000) / 10 : 0);\nconst hitung = [\n  { label: 'Positif', n: positive },\n  { label: 'Negatif', n: negative },\n  { label: 'Netral', n: neutral }\n].sort((a, b) => b.n - a.n);\n\nlet dominan = 'Tidak ada data';\nlet persenDominan = 0;\nif (total > 0) {\n  if (hitung[0].n === hitung[1].n) {          // dua kategori teratas sama besar\n    dominan = 'Seimbang';\n    persenDominan = persen(hitung[0].n);\n  } else {\n    dominan = hitung[0].label;\n    persenDominan = persen(hitung[0].n);\n  }\n}\n\nreturn [{\n  json: {\n    periode: periode,\n    total_tweets: total,\n    sentimen_positif: positive,\n    sentimen_negatif: negative,\n    sentimen_netral: neutral,\n    persen_positif: persen(positive),\n    persen_negatif: persen(negative),\n    persen_netral: persen(neutral),\n    dominan: dominan,\n    persen_dominan: persenDominan\n  }\n}];"
+      },
+      "id": "abe3da8d-3cf5-4943-984c-afe4bd8f6273",
+      "name": "Analisis Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Anda adalah seorang analis sentimen media sosial.\nTuliskan kesimpulan singkat (dalam bahasa Indonesia) untuk laporan Telegram,\nberdasarkan data berikut:\n- Periode Data: {{ $json.periode }}\n- Total Tweet Dianalisis: {{ $json.total_tweets }}\n- Sentimen Positif: {{ $json.sentimen_positif }} ({{ $json.persen_positif }}%)\n- Sentimen Negatif: {{ $json.sentimen_negatif }} ({{ $json.persen_negatif }}%)\n- Sentimen Netral: {{ $json.sentimen_netral }} ({{ $json.persen_netral }}%)\n- Sentimen Dominan: {{ $json.dominan }} ({{ $json.persen_dominan }}%)\n\nBerikan ringkasan singkat tentang apa arti angka-angka ini (misalnya, \"Sentimen hari ini cenderung positif,\" \"Ada banyak keraguan di pasar,\" dll.).\n\nAturan: maksimal 100 kata, teks biasa tanpa tanda markdown, gunakan hanya angka di atas (jangan mengarang data atau harga), dan jangan memberi saran beli atau jual. Jika total tweet 0, sampaikan bahwa belum ada data sentimen.\n\nAturan akurasi:\n- Gunakan kata \"mayoritas\" atau \"sebagian besar\" hanya jika persentasenya di atas 50%. Jika sentimen dominan 50% atau kurang, gunakan frasa \"paling banyak\" atau \"terbanyak\".\n- Jangan menulis pernyataan yang bertentangan dengan angka di atas (misalnya menyebut sentimen negatif \"sebagian besar\" padahal persentasenya lebih kecil dari sentimen positif).\n- Sebutkan sentimen dominan dan persentasenya dengan benar.",
+        "batching": {}
+      },
+      "id": "b83376db-f452-40f3-a0e3-6f567aad7692",
+      "name": "Membuat Kesimpulan",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        880,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "model": "openrouter/free",
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "id": "98777beb-55ba-4323-a25e-d294a6087a7a",
+      "name": "OpenRouter Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        896,
+        784
+      ],
+      "credentials": {
+        "openRouterApi": {
+          "id": "tj2Uro0xdnZL6UL5",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "7091419525",
+        "text": "=📊 Laporan Sentimen Pasar Kripto ($BTC / $ETH)\nPeriode: {{ $('Analisis Data').item.json.periode }}\n\nTotal tweet dianalisis: {{ $('Analisis Data').item.json.total_tweets }}\n🟢 Positif: {{ $('Analisis Data').item.json.sentimen_positif }} ({{ $('Analisis Data').item.json.persen_positif }}%)\n🔴 Negatif: {{ $('Analisis Data').item.json.sentimen_negatif }} ({{ $('Analisis Data').item.json.persen_negatif }}%)\n⚪ Netral: {{ $('Analisis Data').item.json.sentimen_netral }} ({{ $('Analisis Data').item.json.persen_netral }}%)\nSentimen dominan: {{ $('Analisis Data').item.json.dominan }} ({{ $('Analisis Data').item.json.persen_dominan }}%)\n\n📝 Kesimpulan:\n{{ $json.text }}\n\nCatatan: analisis sentimen otomatis, bukan saran investasi.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "148cb79e-3947-4bb9-8b7a-f5cb5886eeff",
+      "name": "Kirim Laporan",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1120,
+        560
+      ],
+      "webhookId": "a8000001-0000-4000-8000-000000000012",
+      "credentials": {
+        "telegramApi": {
+          "id": "Bi3u8rkLbQdgUOu7",
+          "name": "Implementasi AI untuk Keuangan"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## ALUR 1: PENGUMPULAN DATA (tiap 15 menit)\nXpoz (data tweet dari X) > rapikan > klasifikasi sentimen AI > simpan ke Google Sheets",
+        "height": 110,
+        "width": 1250,
+        "color": 4
+      },
+      "id": "92e50e30-2f6d-423a-849d-2b94f9f5cae3",
+      "name": "Catatan Alur 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        112,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## ALUR 2: LAPORAN HARIAN (jam 07.00)\nBaca database > hitung jumlah dan persentase > AI membuat narasi > kirim ke Telegram",
+        "height": 110,
+        "width": 1250,
+        "color": 5
+      },
+      "id": "dea25bdc-1e6e-4f98-8b1b-15b28ec548b2",
+      "name": "Catatan Alur 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        112,
+        336
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Tiap 15 menit": {
+      "main": [
+        [
+          {
+            "node": "Pengambil Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pengambil Data": {
+      "main": [
+        [
+          {
+            "node": "Rapikan Data Tweet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rapikan Data Tweet": {
+      "main": [
+        [
+          {
+            "node": "Analisis Sentimen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analisis Sentimen": {
+      "main": [
+        [
+          {
+            "node": "Penyimpanan Hasil",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tiap jam 7 pagi": {
+      "main": [
+        [
+          {
+            "node": "Baca Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baca Data": {
+      "main": [
+        [
+          {
+            "node": "Analisis Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analisis Data": {
+      "main": [
+        [
+          {
+            "node": "Membuat Kesimpulan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Membuat Kesimpulan": {
+      "main": [
+        [
+          {
+            "node": "Kirim Laporan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analisis Sentimen",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Membuat Kesimpulan",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a8ada673-3240-4484-8085-f112503989cf",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "dc96f10ae7dc95d3c138575ba243a0a167923dbcb524841d451aadf9135d5fb3"
+  },
+  "nodeGroups": [],
+  "id": "uCArJrAZwrLAqUNO",
+  "tags": []
+}
